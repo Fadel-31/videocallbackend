@@ -13,9 +13,13 @@ app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => res.send("Server is running"));
-
+// Allow both localhost and your Vercel frontend
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://videocallfrontend.vercel.app"
+];
 const io = new Server(server, {
-  cors: { origin: "http://localhost:5173", methods: ["GET", "POST"] },
+  cors: { origin: allowedOrigins, methods: ["GET", "POST"] },
 });
 
 const rooms = {};
