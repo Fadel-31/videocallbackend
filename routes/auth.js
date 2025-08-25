@@ -3,6 +3,9 @@ const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const protect = require("../middleware/authMiddleware");
 
+// Handle OPTIONS requests
+router.options("*", (req, res) => res.sendStatus(200));
+
 // Register
 router.post("/register", async (req, res) => {
   const { username, email, password } = req.body;
