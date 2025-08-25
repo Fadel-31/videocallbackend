@@ -14,10 +14,11 @@ const allowedOrigins = [
   "https://videocallfrontend.vercel.app", // deployed frontend
 ];
 
-// --- Apply CORS globally with preflight handling ---
+// --- Global CORS setup ---
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    // allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
@@ -27,7 +28,7 @@ app.use(cors({
   credentials: true
 }));
 
-// Parse JSON
+// --- Parse JSON ---
 app.use(express.json());
 
 // --- Routes ---
@@ -56,6 +57,7 @@ io.on("connection", (socket) => {
     if (!rooms[roomId]) rooms[roomId] = [];
     rooms[roomId].push({ id: socket.id, username, muted: false });
 
+    // send existing users in the room
     socket.emit("all-users", rooms[roomId].filter(u => u.id !== socket.id));
     socket.to(roomId).emit("user-connected", { id: socket.id, username, muted: false });
 
