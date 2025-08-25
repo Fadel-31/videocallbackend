@@ -10,23 +10,29 @@ const server = http.createServer(app);
 
 // Allowed origins
 const allowedOrigins = [
-  "http://localhost:5173", // local frontend
-  "https://videocallfrontend.vercel.app", // deployed frontend
+  "http://localhost:5173",
+  "https://videocallfrontend.vercel.app",
 ];
 
 // --- Global CORS setup ---
-app.use(cors({
-  origin: function(origin, callback) {
-    // allow requests with no origin (like mobile apps, curl, Postman)
+const corsOptions = {
+  origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
+      callback(null, true); // allow
     } else {
-      callback(new Error("Not allowed by CORS"));
+      callback(null, false); // reject without throwing an error
     }
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  credentials: true
-}));
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+};
+
+// Apply CORS to all routes
+app.use(cors(corsOptions));
+
+// Ensure preflight OPTIONS requests are handled
+app.options("*", cors(corsOptions));
 
 // --- Parse JSON ---
 app.use(express.json());
@@ -41,7 +47,7 @@ const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
   },
 });
 
@@ -57,21 +63,20 @@ io.on("connection", (socket) => {
     if (!rooms[roomId]) rooms[roomId] = [];
     rooms[roomId].push({ id: socket.id, username, muted: false });
 
-    // send existing users in the room
-    socket.emit("all-users", rooms[roomId].filter(u => u.id !== socket.id));
+    socket.emit("all-users", rooms[roomId].filter((u) => u.id !== socket.id));
     socket.to(roomId).emit("user-connected", { id: socket.id, username, muted: false });
 
     socket.on("disconnect", () => {
-      rooms[roomId] = rooms[roomId].filter(u => u.id !== socket.id);
+      rooms[roomId] = rooms[roomId].filter((u) => u.id !== socket.id);
       socket.to(roomId).emit("user-disconnected", socket.id);
       console.log("User disconnected:", socket.id);
     });
   });
 
   // WebRTC signaling
-  socket.on("offer", payload => io.to(payload.target).emit("offer", payload));
-  socket.on("answer", payload => io.to(payload.target).emit("answer", payload));
-  socket.on("ice-candidate", payload => io.to(payload.target).emit("ice-candidate", payload));
+  socket.on("offer", (payload) => io.to(payload.target).emit("offer", payload));
+  socket.on("answer", (payload) => io.to(payload.target).emit("answer", payload));
+  socket.on("ice-candidate", (payload) => io.to(payload.target).emit("ice-candidate", payload));
 
   // Chat
   socket.on("send-message", ({ roomId, message, username }) => {
