@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const protect = require("../middleware/authMiddleware");
 
 // Handle OPTIONS requests
-router.options("*", (req, res) => res.sendStatus(200));
+router.options(/(.*)/, (req, res) => res.sendStatus(200));
 
 // Register
 router.post("/register", async (req, res) => {
