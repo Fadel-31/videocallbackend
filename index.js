@@ -2,33 +2,53 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const cors = require("cors");
+const connectDB = require("./db");
+const authRoutes = require("./routes/auth");
 
 const app = express();
 const server = http.createServer(app);
-const connectDB = require("./db");
 
-const authRoutes = require("./routes/auth");
-// Allow both localhost and your Vercel frontend
+// Allowed origins
 const allowedOrigins = [
-  "http://localhost:5173",
-  "https://videocallfrontend.vercel.app"
+  "http://localhost:5173", // local frontend
+  "https://videocallfrontend.vercel.app", // deployed frontend
 ];
 
+// --- Apply CORS globally with preflight handling ---
 app.use(cors({
-  origin: allowedOrigins,
-  methods: ["GET", "POST"],
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true
 }));
+
+// Handle preflight requests for all routes
+app.options("*", cors());
+
+// Parse JSON
 app.use(express.json());
+
+// --- Routes ---
+app.use("/api/auth", authRoutes);
 
 app.get("/", (req, res) => res.send("Server is running"));
 
+// --- Socket.IO setup ---
 const io = new Server(server, {
-  cors: { origin: allowedOrigins, methods: ["GET", "POST"] },
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true
+  },
 });
 
+// --- Rooms storage ---
 const rooms = {};
-app.use("/api/auth", authRoutes);
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
@@ -39,11 +59,8 @@ io.on("connection", (socket) => {
     if (!rooms[roomId]) rooms[roomId] = [];
     rooms[roomId].push({ id: socket.id, username, muted: false });
 
-    // Notify new user about existing users
     socket.emit("all-users", rooms[roomId].filter(u => u.id !== socket.id));
-
-    // Notify others about new user
-socket.to(roomId).emit("user-connected", { id: socket.id, username, muted: false });
+    socket.to(roomId).emit("user-connected", { id: socket.id, username, muted: false });
 
     socket.on("disconnect", () => {
       rooms[roomId] = rooms[roomId].filter(u => u.id !== socket.id);
@@ -63,5 +80,9 @@ socket.to(roomId).emit("user-connected", { id: socket.id, username, muted: false
   });
 });
 
+// --- Connect DB ---
 connectDB();
-server.listen(5000, () => console.log("Server running on port 5000"));
+
+// --- Start server ---
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
