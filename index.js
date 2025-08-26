@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -9,40 +8,43 @@ const authRoutes = require("./routes/auth");
 const app = express();
 const server = http.createServer(app);
 
-// Allowed origins
+// ✅ Allowed origins
 const allowedOrigins = [
-  "http://localhost:5173",
-  "https://videocallfrontend.vercel.app",
+  "http://localhost:5173",                  // local frontend
+  "https://videocallfrontend.vercel.app",   // deployed frontend
 ];
 
-// --- Universal CORS middleware ---
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  }
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
-  );
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Credentials", "true");
+// ✅ Use CORS middleware globally
+const corsOptions = {
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 200, // For older browsers
+};
 
-  // Preflight request
-  if (req.method === "OPTIONS") return res.sendStatus(200);
+app.use(cors(corsOptions));
 
-  next();
-});
+// ✅ Handle preflight OPTIONS requests explicitly
+app.options("*", cors(corsOptions));
 
-// --- Parse JSON ---
+// ✅ Parse JSON
 app.use(express.json());
 
-// --- Routes ---
+// ✅ API Routes
 app.use("/api/auth", authRoutes);
 
-app.get("/", (req, res) => res.send("Server is running"));
+// ✅ Health check
+app.get("/", (req, res) => res.send("Server is running 🚀"));
 
-// --- Socket.IO setup ---
+// ✅ Socket.IO setup
 const io = new Server(server, {
   cors: {
     origin: allowedOrigins,
@@ -51,7 +53,7 @@ const io = new Server(server, {
   },
 });
 
-// --- Rooms storage ---
+// ✅ Rooms storage
 const rooms = {};
 
 io.on("connection", (socket) => {
@@ -63,7 +65,6 @@ io.on("connection", (socket) => {
     if (!rooms[roomId]) rooms[roomId] = [];
     rooms[roomId].push({ id: socket.id, username, muted: false });
 
-    // send existing users in the room
     socket.emit("all-users", rooms[roomId].filter((u) => u.id !== socket.id));
     socket.to(roomId).emit("user-connected", { id: socket.id, username, muted: false });
 
@@ -74,20 +75,20 @@ io.on("connection", (socket) => {
     });
   });
 
-  // WebRTC signaling
+  // ✅ WebRTC signaling
   socket.on("offer", (payload) => io.to(payload.target).emit("offer", payload));
   socket.on("answer", (payload) => io.to(payload.target).emit("answer", payload));
   socket.on("ice-candidate", (payload) => io.to(payload.target).emit("ice-candidate", payload));
 
-  // Chat
+  // ✅ Chat system
   socket.on("send-message", ({ roomId, message, username }) => {
     io.to(roomId).emit("receive-message", { message, username });
   });
 });
 
-// --- Connect to MongoDB ---
+// ✅ Connect MongoDB
 connectDB();
 
-// --- Start server ---
+// ✅ Start server
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
